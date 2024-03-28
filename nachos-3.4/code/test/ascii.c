@@ -19,7 +19,6 @@ int main()
     int j = 0;
     OpenFileId file;
     char table[188];
-    
     Create("ascii.txt");
     file = Open("ascii.txt", 0);
     PrintString("\nBANG MA ASCII CAC KY TU DOC DUOC\n");

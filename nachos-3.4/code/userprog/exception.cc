@@ -673,7 +673,7 @@ ExceptionHandler(ExceptionType which)
                             if (fileSystem->openf[id]->type == 3) // Xet truong hop con lai ghi file stdout (type quy uoc la 3)
                             {
                                 int i = 0;
-                                while (buf[i] != 0 && buf[i] != '\n') // Vong lap de write den khi gap ky tu '\n'
+                                while (buf[i] != 0 && buf[i] != '\n' && buf[i] != NULL) // Vong lap de write den khi gap ky tu '\n'
                                 {
                                     gSynchConsole->Write(buf + i, 1); // Su dung ham Write cua lop SynchConsole 
                                     i++;
