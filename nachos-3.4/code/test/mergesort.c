@@ -7,23 +7,6 @@ int charArrayLength(const char* charArray) {
     return length;
 }
 
-void numberToCharArray(int number, char* charArray) {
-
-    char tempArray[256]; 
-    int i = 0;
-    int index = 0;
-    while (number != 0) {
-        tempArray[index++] = '0' + (number % 10);
-        number /= 10;
-    }
-
-    // Reverse the temporary array to get the digits in correct order
-    for (i = 0; i < index; ++i) {
-        charArray[i] = tempArray[index - i - 1];
-    }
-    charArray[index] = '\0';
-}
-
 void merge(int arr[], int l, int m, int r) {
     int n1 = m - l + 1;
     int n2 = r - m;
@@ -83,40 +66,33 @@ void mergeSort(int arr[], int l, int r) {
 
 int main()
 {
-    int arr[10];
-    int n = 10;
+    int arr[5];
+    int n = 5;
     char num[255]; //char array to store a number
     int i = 0;
     char endline[2];
+    int buffersize;
     OpenFileId file;
-
-
-
-
-
-
 
     endline[0] = '\n';
     for (i = 0; i < n; ++i) 
     {
-        PrintString("Nhap so nguyen:");
-        arr[i] = ReadInt();
+        PrintString("Nhap so thuc:");
+        arr[i] = ReadFloat();
     }
     mergeSort(arr, 0, n - 1);
     
-    Create("ascii.txt");
-    file = Open("ascii.txt", 0);
-    PrintString("Mang int :\n");
+    Create("mergesort.txt");
+    file = Open("mergesort.txt", 0);
+
     for (i = 0; i < n; i++)
     {
-        numberToCharArray(arr[i], num);
-        PrintString(num);
-        PrintChar('\n');
-        Write(num, charArrayLength(num), file);
-        Write(endline, 1, file);
+        buffersize = FloatToBuffer(num, arr[i]);
+        num[buffersize] = ' ';
+        buffersize++;
+        num[buffersize] = '\0';
+        Write(num, buffersize, file);
     }
-
-
 
     Close(file);
     Halt();

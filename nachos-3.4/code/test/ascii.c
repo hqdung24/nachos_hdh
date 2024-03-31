@@ -22,12 +22,13 @@ int main()
     Create("ascii.txt");
     file = Open("ascii.txt", 0);
     PrintString("\nBANG MA ASCII CAC KY TU DOC DUOC\n");
-    for (i = 32; i < 127; i++)
+    for (i = 33; i < 127; i++)
     {
         PrintInt(i);
-        PrintChar('\t');
-        ch = i;
+        PrintChar(':');
+        ch = (char)i;
         PrintChar(ch);
+        PrintChar('\t');
         table[j] = ch;
         j++;
         table[j] = '\n';

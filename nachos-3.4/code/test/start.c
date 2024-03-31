@@ -203,6 +203,14 @@ ReadFloat:
 	syscall
 	j	$31
 	.end ReadFloat
+
+	.globl FloatToBuffer
+	.ent FloatToBuffer
+FloatToBuffer:
+	addiu $2, $0, SC_FloatToBuffer
+	syscall
+	j	$31
+	.end FloatToBuffer
 /* dummy function to keep gcc happy */
         .globl  __main
         .ent    __main

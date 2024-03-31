@@ -39,7 +39,7 @@
 #define SC_PrintFloat	18
 #define SC_ReadFloat 19
 #define SC_Sub 		43
-
+#define SC_FloatToBuffer 44
 
 #ifndef IN_ASM
 
@@ -145,13 +145,13 @@ void PrintChar(char character);
 
 void PrintString(char buffer[]);
 
-void PrintFloat(float* number);
+void PrintFloat(int number);
 
 int ReadInt();
 char ReadChar();
 void ReadString(char buffer[], int length);
-float* ReadFloat();
-
+int* ReadFloat();
+int FloatToBuffer(char* buffer, int num);
 
 #endif /* IN_ASM */
 

@@ -57,34 +57,29 @@ void IncreasePC()
     machine->WriteRegister(NextPCReg, counter + 4);
 }
 
-// Input: Khong gian dia chi User(int) - gioi han cua buffer(int)
-// Output: Bo nho dem Buffer(char*)
 // Chuc nang: Sao chep vung nho User sang vung nho System
 char* User2System(int virtAddr, int limit)
 {
     int i; //chi so index
     int oneChar;
-    char* kernelBuf = NULL;
-    kernelBuf = new char[limit + 1]; //can cho chuoi terminal
-    if (kernelBuf == NULL)
-        return kernelBuf;
+    char* kernelBuffer = NULL;
+    kernelBuffer = new char[limit + 1];
+    if (kernelBuffer == NULL)
+        return kernelBuffer;
         
-    memset(kernelBuf, 0, limit + 1);
+    memset(kernelBuffer, 0, limit + 1);
     
     for (i = 0; i < limit; i++)
     {
-        machine->ReadMem(virtAddr + i, 1, &oneChar);
-        kernelBuf[i] = (char)oneChar;
+        machine->ReadMem(virtAddr + i, 1, &oneChar);//doc tung byte cua virtAddr va luu vao kernelbuf
+        kernelBuffer[i] = (char)oneChar;
         if (oneChar == 0)
             break;
     }
-    return kernelBuf;
+    return kernelBuffer;
 }
 
-
-// Input: Khong gian vung nho User(int) - gioi han cua buffer(int) - bo nho dem buffer(char*)
-// Output: So byte da sao chep(int)
-// Chuc nang: Sao chep vung nho System sang vung nho User
+// Sao chep vung nho System sang vung nho User
 int System2User(int virtAddr, int len, char* buffer)
 {
     if (len < 0) return -1;
@@ -93,65 +88,16 @@ int System2User(int virtAddr, int len, char* buffer)
     int oneChar = 0;
     do{
         oneChar = (int)buffer[i];
-        machine->WriteMem(virtAddr + i, 1, oneChar);
+        machine->WriteMem(virtAddr + i, 1, oneChar);//doc tung byte cua kernel buffer va luu vao dia chi user virt addr
         i++;
     } while (i < len && oneChar != 0);
     return i;
 }
 
-int string_to_float(const char *string, float *result) {
-    int sign = 1;
-    int whole = 0;
-    int decimal = 0;
-    int decimalPlaces = 0; 
-    int state = 0; // 0: before decimal, 1: after decimal
-
-    // Handle optional sign
-    if (*string == '-') {
-        sign = -1;
-        string++;
-    } else if (*string == '+') {
-        string++;
-    }
-
-    // Process whole part
-    while (*string >= '0' && *string <= '9') { 
-        whole = whole * 10 + (*string - '0');
-        string++;
-    }
-
-    // Check for decimal point
-    if (*string == '.') {
-        string++;
-        state = 1; 
-    }
-
-    // Process decimal part
-    while (*string >= '0' && *string <= '9') { 
-        decimal = decimal * 10 + (*string - '0');
-        decimalPlaces++;
-        string++;
-    }
-
-    // Check for extra characters
-    if (*string != '\0') {
-        return -1; // Error: extra characters
-    }
-
-    // Calculate final value 
-    float divisor = 1.0;
-    for (int i = 0; i < decimalPlaces; i++) {
-        divisor *= 10.0;
-    }
-    *result = sign * (whole + decimal / divisor);
-
-    return 0; // Success
-}
-
-char* float_to_string(float value, int& required_size) {
-    required_size = snprintf(NULL, 0, "%f", value); // Determine necessary buffer size
-    char *str = new char[required_size + 1];  // Allocate space
-    snprintf(str, required_size + 1, "%f", value); // Format float into string
+char* float_to_buffer(float value, int& max_len) {
+    max_len = snprintf(NULL, 0, "%f", value); // Determine necessary buffer size
+    char *str = new char[max_len + 1];  // Allocate space
+    snprintf(str, max_len + 1, "%f", value); // Format float into string
     return str;
 }
 
@@ -166,32 +112,32 @@ ExceptionHandler(ExceptionType which)
             return;
 
         case PageFaultException:
-            DEBUG('a', "PageFault is happening!.\n");
+            DEBUG('a', "PageFault.\n");
             interrupt->Halt();
             break;
 
         case BusErrorException:
-            DEBUG('a', "BusError is happening!.\n");
+            DEBUG('a', "BusError.\n");
             interrupt->Halt();
             break;
 
         case AddressErrorException:
-            DEBUG('a', "AddressError is happening!.\n");
+            DEBUG('a', "AddressError.\n");
             interrupt->Halt();
             break;
 
         case OverflowException:
-            DEBUG('a', "Overflow is happening!.\n");
+            DEBUG('a', "Overflow.\n");
             interrupt->Halt();
             break;
 
         case IllegalInstrException:
-            DEBUG('a', "IllegalInstr is happening!.\n");
+            DEBUG('a', "IllegalInstr.\n");
             interrupt->Halt();
             break;
 
         case NumExceptionTypes:
-            DEBUG('a', "IllegalInstr is happening!.\n");
+            DEBUG('a', "IllegalInstr.\n");
             interrupt->Halt();
             break;
 
@@ -210,61 +156,80 @@ ExceptionHandler(ExceptionType which)
                         machine->WriteRegister (2, result); 
                         interrupt->Halt();
                         break; 
+                    case SC_FloatToBuffer:
+                    {
+                        int virtAddr;
+                        int number;
+                        char* buffer;
+                        int i =0;
+                        virtAddr = machine->ReadRegister(4); 
+                        number =  machine->ReadRegister(5);
 
+                        buffer = User2System(virtAddr, 255); // Copy chuoi tu vung nho User Space sang System Space
+                        float* val = (float*)&number;
+                        int len = 255;
+                        buffer = float_to_buffer(*val, len); 
+                        while(buffer[i] != '\0')
+                        {
+                            i++;
+                        }
+                        System2User(virtAddr, 255, buffer); // Copy chuoi tu vung nho System Space sang vung nho User Space
+                        machine->WriteRegister(2, i);
+                        delete buffer; 
+                        IncreasePC(); // Tang Program Counter 
+                        return;
+                        break;
+                    }
                     case SC_PrintInt:  
                     {
-                        int number = machine->ReadRegister(4);
-                        if(number == 0)
+                        int num = machine->ReadRegister(4);
+                        int temp = num; 
+                        int lenghtOfNum = 0; 
+                        int firstNumIndex = 0; 
+                        bool isNegative = false; 
+                        if(num == 0)
                             {
-                                gSynchConsole->Write("0", 1); // In ra man hinh so 0
+                                gSynchConsole->Write("0", 1); 
                                 IncreasePC();
                                 return;    
                             }
                             
-                            /*Qua trinh chuyen so thanh chuoi de in ra man hinh*/
-                            bool isNegative = false; // gia su la so duong
-                            int numberOfNum = 0; // Bien de luu so chu so cua number
-                            int firstNumIndex = 0; 
-                    
-                            if(number < 0)
+                            if(num < 0)
                             {
                                 isNegative = true;
-                                number = number * -1; // Nham chuyen so am thanh so duong de tinh so chu so
+                                num = num * -1; 
                                 firstNumIndex = 1; 
                             }   
                             
-                            int t_number = number; // bien tam cho number
-                            while(t_number)
+                            while(temp)
                             {
-                                numberOfNum++;
-                                t_number /= 10;
+                                lenghtOfNum++;
+                                temp /= 10;
                             }
-            
-                    // Tao buffer chuoi de in ra man hinh
+                            //tao buffer tu so nguyen de ghi ra man hinh
                             char* buffer;
-                            int MAX_BUFFER = 255;
-                            buffer = new char[MAX_BUFFER + 1];
-                            for(int i = firstNumIndex + numberOfNum - 1; i >= firstNumIndex; i--)
+                            int MAX_LEN = 255;
+                            buffer = new char[MAX_LEN + 1];
+                            for(int i = firstNumIndex + lenghtOfNum - 1; i >= firstNumIndex; i--)
                             {
-                                buffer[i] = (char)((number % 10) + 48);
-                                number /= 10;
+                                buffer[i] = (char)((num % 10) + 48);
+                                num /= 10;
                             }
                             if(isNegative)
                             {
                                 buffer[0] = '-';
-                            buffer[numberOfNum + 1] = 0;
-                                gSynchConsole->Write(buffer, numberOfNum + 1);
+                                buffer[lenghtOfNum + 1] = 0;
+                                gSynchConsole->Write(buffer, lenghtOfNum + 1);
                                 delete buffer;
                                 IncreasePC();
                                 return;
                             }
-                            buffer[numberOfNum] = 0;    
-                            gSynchConsole->Write(buffer, numberOfNum);
+                            buffer[lenghtOfNum] = 0;    
+                            gSynchConsole->Write(buffer, lenghtOfNum);
                             delete buffer;
                             IncreasePC();
                             return; 
                     }
-                    
                     case SC_PrintChar:
                         {
                             // Input: Ki tu(char)
@@ -276,51 +241,40 @@ ExceptionHandler(ExceptionType which)
                             return;
                             break;
                         }
-
                     case SC_PrintString:
                         {
-                            // Input: Buffer(char*)
-                            // Output: Chuoi doc duoc tu buffer(char*)
-                            // Cong dung: Xuat mot chuoi la tham so buffer truyen vao ra man hinh
                             int virtAddr;
                             char* buffer;
-                            virtAddr = machine->ReadRegister(4); // Lay dia chi cua tham so buffer tu thanh ghi so 4
-                            buffer = User2System(virtAddr, 255); // Copy chuoi tu vung nho User Space sang System Space voi bo dem buffer dai 255 ki tu
+                            virtAddr = machine->ReadRegister(4); 
+                            buffer = User2System(virtAddr, 255); 
                             int length = 0;
-                            while (buffer[length] != 0) length++; // Dem do dai that cua chuoi
-                            gSynchConsole->Write(buffer, length + 1); // Goi ham Write cua SynchConsole de in chuoi
+                            while (buffer[length] != 0) length++; 
+                            gSynchConsole->Write(buffer, length + 1); 
                             delete buffer; 
                             IncreasePC(); // Tang Program Counter 
                             return;
                             break;
                         }
-
                     case SC_PrintFloat:
-                        {
- 					float* f =  (float*)machine->ReadRegister(4);
-   					int len;
-   					char* buffer = float_to_string(*f, len);
-   					gSynchConsole->Write(buffer, len);
-                    IncreasePC(); // Tang Program Counter 
-                    return;
-   					break;
-                        }
-
+                    {
+                        int number =  machine->ReadRegister(4);
+                        float* val = (float*)&number;
+                        int len = 255;
+                        char* buffer = float_to_buffer(*val, len);
+                        gSynchConsole->Write(buffer, len);
+                        IncreasePC(); // Tang Program Counter 
+                        return;
+                        break;
+                    }
                     case SC_ReadInt:
 		            {
-		// Input: K co
-                    // Output: Tra ve so nguyen doc duoc tu man hinh console.
-                    // Chuc nang: Doc so nguyen tu man hinh console.
                     char* buffer;
-                    int MAX_BUFFER = 255;
-                    buffer = new char[MAX_BUFFER + 1];
-                    int numbytes = gSynchConsole->Read(buffer, MAX_BUFFER);// doc buffer toi da MAX_BUFFER ki tu, tra ve so ki tu doc dc
-                    int number = 0; // so luu ket qua tra ve cuoi cung
-						
-                    /* Qua trinh chuyen doi tu buffer sang so nguyen int */
-			
-                    // Xac dinh so am hay so duong                       
-                    bool isNegative = false; // Gia thiet la so duong.
+                    int MAX_LEN = 255;
+                    buffer = new char[MAX_LEN + 1];
+                    int numbytes = gSynchConsole->Read(buffer, MAX_LEN);
+                    int number = 0; 
+						                    
+                    bool isNegative = false; 
                     int firstNumIndex = 0;
                     int lastNumIndex = 0;
                     if(buffer[0] == '-')
@@ -333,7 +287,7 @@ ExceptionHandler(ExceptionType which)
                     // Kiem tra tinh hop le cua so nguyen buffer
                     for(int i = firstNumIndex; i < numbytes; i++)					
                     {
-                        if(buffer[i] == '.') /// 125.0000000 van la so
+                        if(buffer[i] == '.')
                         {
                             int j = i + 1;
                             for(; j < numbytes; j++)
@@ -341,22 +295,21 @@ ExceptionHandler(ExceptionType which)
 				// So khong hop le
                                 if(buffer[j] != '0')
                                 {
-                                    printf("\n\n The integer number is not valid");
-                                    DEBUG('a', "\n The integer number is not valid");
+                                    printf("\n\n The number is not valid");
+                                    DEBUG('a', "\n The number is not valid");
                                     machine->WriteRegister(2, 0);
                                     IncreasePC();
                                     delete buffer;
                                     return;
                                 }
                             }
-                            // la so thoa cap nhat lastNumIndex
                             lastNumIndex = i - 1;				
                             break;                           
                         }
                         else if(buffer[i] < '0' && buffer[i] > '9')
                         {
-                            printf("\n\n The integer number is not valid");
-                            DEBUG('a', "\n The integer number is not valid");
+                            printf("\n\n The number is not valid");
+                            DEBUG('a', "\n The number is not valid");
                             machine->WriteRegister(2, 0);
                             IncreasePC();
                             delete buffer;
@@ -380,13 +333,10 @@ ExceptionHandler(ExceptionType which)
                     IncreasePC();
                     delete buffer;
                     return;		
-		            }
-                    
+		            }                  
                     case SC_ReadChar:
                 {
-                    //Input: Khong co
-                    //Output: Duy nhat 1 ky tu (char)
-                    //Cong dung: Doc mot ky tu tu nguoi dung nhap
+
                     int maxBytes = 255;
                     char* buffer = new char[255];
                     int numBytes = gSynchConsole->Read(buffer, maxBytes);
@@ -410,7 +360,6 @@ ExceptionHandler(ExceptionType which)
                         //Chuoi vua lay co dung 1 ky tu, lay ky tu o index = 0, return vao thanh ghi R2
                         char c = buffer[0];
                         machine->WriteRegister(2, c);
-
                     }
 
                     delete buffer;
@@ -418,82 +367,106 @@ ExceptionHandler(ExceptionType which)
                     return;
                     break;
                 }
-                case SC_ReadString:
-                {
-                    // Input: Buffer(char*), do dai toi da cua chuoi nhap vao(int)
-                    // Output: Khong co
-                    // Cong dung: Doc vao mot chuoi voi tham so la buffer va do dai toi da
-                    int virtAddr, length;
-                    char* buffer;
-                    virtAddr = machine->ReadRegister(4); // Lay dia chi tham so buffer truyen vao tu thanh ghi so 4
-                    length = machine->ReadRegister(5); // Lay do dai toi da cua chuoi nhap vao tu thanh ghi so 5
-                    buffer = User2System(virtAddr, length); // Copy chuoi tu vung nho User Space sang System Space
-                    gSynchConsole->Read(buffer, length); // Goi ham Read cua SynchConsole de doc chuoi
-                    System2User(virtAddr, length, buffer); // Copy chuoi tu vung nho System Space sang vung nho User Space
-                    delete buffer; 
-                    IncreasePC(); // Tang Program Counter 
-                    return;
-                    break;
-                }
-                case SC_ReadFloat:
-   				{
-   					char* buffer = new char[1024+1];
-   					gSynchConsole->Read(buffer, 1024);
-   					float* f = new float;
-   					string_to_float(buffer, f);
-   					machine->WriteRegister(2, (int)f);
-                    IncreasePC(); // Tang Program Counter 
-                    return;
-   					break;
-   				}
-            case SC_Create: 
-                { 
-                    int virtAddr; 
-                    char* filename; 
-                    //DEBUG(‘a’,"\n SC_Create call ..."); 
-                    //DEBUG(‘a’,"\n Reading virtual address of filename"); 
-                    // Lấy tham số tên tập tin từ thanh ghi r4 
-                    virtAddr = machine->ReadRegister(4); 
-                    //DEBUG (‘a’,"\n Reading filename."); 
-                    // MaxFileLength là = 32 
-                    filename = User2System(virtAddr,MaxFileLength+1); 
-                    if (filename == NULL) 
-                    { 
-                        //printf("\n Not enough memory in system"); 
-                        //DEBUG(‘a’,"\n Not enough memory in system"); 
-                        machine->WriteRegister(2,-1); // trả về lỗi cho chương 
-                        // trình người dùng 
-                        delete filename; 
-                        return; 
-                    } 
-                    //DEBUG(‘a’,"\n Finish reading filename."); 
-                    //DEBUG(‘a’,"\n File name : '"<<filename<<"'"); 
-                    // Create file with size = 0 
-                    // Dùng đối tượng fileSystem của lớp OpenFile để tạo file, 
-                    // việc tạo file này là sử dụng các thủ tục tạo file của hệ điều 
-                    // hành Linux, chúng ta không quản ly trực tiếp các block trên 
-                    // đĩa cứng cấp phát cho file, việc quản ly các block của file 
-                    // trên ổ đĩa là một đồ án khác 
-                    if (!fileSystem->Create(filename,0)) 
-                    { 
-                        //printf("\n Error create file '%s'",filename); 
-                        machine->WriteRegister(2,-1); 
-                        delete filename; 
-                        return; 
-                    } 
-                    machine->WriteRegister(2,0); // trả về cho chương trình 
-                        // người dùng thành công 
-                    delete filename;
-                    IncreasePC();
-                    break; 
-                    }
-
-                case SC_Open:
+                    case SC_ReadString:
                     {
-                        // Input: arg1: Dia chi cua chuoi name, arg2: type
-                        // Output: Tra ve OpenFileID neu thanh, -1 neu loi
-                        // Chuc nang: Tra ve ID cua file.
-                    
+                        int virtualAddr, length;
+                        char* kernelbuffer;
+                        virtualAddr = machine->ReadRegister(4);
+                        length = machine->ReadRegister(5); 
+                        kernelbuffer = User2System(virtualAddr, length); //lay dia chi cua vung kernel luu vao buffer
+                        gSynchConsole->Read(kernelbuffer, length); 
+                        System2User(virtualAddr, length, kernelbuffer); 
+                        delete kernelbuffer; 
+                        IncreasePC(); 
+                        return;
+                        break;
+                    }
+                    case SC_ReadFloat:
+                    {
+                        int sign = 1;
+                        int intPart = 0;
+                        int decPart = 0;
+                        int decimalCount = 0; 
+                        int state = 0; // 0: before decimal, 1: after decimal
+                        float* result = new float;
+                        char* string = new char[1024+1];
+                        gSynchConsole->Read(string, 1024);
+                        if (*string == '-') {
+                            sign = -1;
+                            string++;
+                        } else if (*string == '+') {
+                            string++;
+                        }
+
+                        // Process integer part
+                        while (*string >= '0' && *string <= '9') { 
+                            intPart = intPart * 10 + (*string - '0');
+                            string++;
+                        }
+
+                        // Check for decimal point
+                        if (*string == '.') {
+                            string++;
+                            state = 1; 
+                        }
+
+                        // Process decimal part
+                        while (*string >= '0' && *string <= '9') { 
+                            decPart = decPart * 10 + (*string - '0');
+                            decimalCount++;
+                            string++;
+                        }
+
+                        // Check for extra characters
+                        if (*string != '\0') {
+                            return; // Error: extra characters
+                        }
+
+                        // Calculate final value 
+                        float divisor = 1.0;
+                        for (int i = 0; i < decimalCount; i++) {
+                            divisor *= 10.0;
+                        }
+                        *result = sign * (intPart + decPart / divisor);
+                        int* val;
+                        val = (int*)(result);                
+                        machine->WriteRegister(2, *val);
+                        IncreasePC(); // Tang Program Counter 
+                        return;
+                        break;
+                    }
+                    case SC_Create: 
+                    { 
+                        int virtAddr; 
+                        char* filename; 
+                        // Lấy tham số tên tập tin từ thanh ghi r4 
+                        virtAddr = machine->ReadRegister(4); 
+                        filename = User2System(virtAddr,MaxFileLength+1); 
+                        if (filename == NULL) 
+                        { 
+ 
+                            machine->WriteRegister(2,-1); // trả về lỗi cho chương 
+                            // trình người dùng 
+                            delete filename; 
+                            return; 
+                        } 
+
+                        if (!fileSystem->Create(filename,0)) 
+                        { 
+                            //printf("\n Error create file '%s'",filename); 
+                            machine->WriteRegister(2,-1); 
+                            delete filename; 
+                            return; 
+                        } 
+                        machine->WriteRegister(2,0); // trả về cho chương trình 
+                            // người dùng thành công 
+                        delete filename;
+                        IncreasePC();
+                        break; 
+                        }
+                    case SC_Open:
+                    {
+
                         //OpenFileID Open(char *name, int type)
                         int virtAddr = machine->ReadRegister(4); // Lay dia chi cua tham so name tu thanh ghi so 4
                         int type = machine->ReadRegister(5); // Lay tham so type tu thanh ghi so 5
@@ -531,11 +504,9 @@ ExceptionHandler(ExceptionType which)
                         IncreasePC();
                         break;
                     }
-
-                case SC_Close:
+                    case SC_Close:
                     {
-                        //Input id cua file(OpenFileID)
-                        // Output: 0: thanh cong, -1 that bai
+
                         int fid = machine->ReadRegister(4); // Lay id cua file tu thanh ghi so 4
                         if (fid >= 0 && fid <= 14) //Chi xu li khi fid nam trong [0, 14]
                         {
@@ -552,12 +523,8 @@ ExceptionHandler(ExceptionType which)
                         IncreasePC();
                         break;
                     }
-
-                case SC_Read:
+                    case SC_Read:
                     {
-                        // Input: buffer(char*), so ky tu(int), id cua file(OpenFileID)
-                        // Output: -1: Loi, So byte read thuc su: Thanh cong, -2: Thanh cong
-                        // Cong dung: Doc file voi tham so la buffer, so ky tu cho phep va id cua file
                         int virtAddr = machine->ReadRegister(4); // Lay dia chi cua tham so buffer tu thanh ghi so 4
                         int charcount = machine->ReadRegister(5); // Lay charcount tu thanh ghi so 5
                         int id = machine->ReadRegister(6); // Lay id cua file tu thanh ghi so 6 
@@ -619,12 +586,8 @@ ExceptionHandler(ExceptionType which)
                         IncreasePC();
                         return;
                     }
-
-               case SC_Write:
+                    case SC_Write:
                         {
-                            // Input: buffer(char*), so ky tu(int), id cua file(OpenFileID)
-                            // Output: -1: Loi, So byte write thuc su: Thanh cong, -2: Thanh cong
-                            // Cong dung: Ghi file voi tham so la buffer, so ky tu cho phep va id cua file
                             int virtAddr = machine->ReadRegister(4); // Lay dia chi cua tham so buffer tu thanh ghi so 4
                             int charcount = machine->ReadRegister(5); // Lay charcount tu thanh ghi so 5
                             int id = machine->ReadRegister(6); // Lay id cua file tu thanh ghi so 6
