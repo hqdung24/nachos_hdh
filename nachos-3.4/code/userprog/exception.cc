@@ -335,7 +335,7 @@ ExceptionHandler(ExceptionType which)
                     return;		
 		            }                  
                     case SC_ReadChar:
-                {
+                    {
 
                     int maxBytes = 255;
                     char* buffer = new char[255];
@@ -366,7 +366,7 @@ ExceptionHandler(ExceptionType which)
                     IncreasePC(); // error system
                     return;
                     break;
-                }
+                    }
                     case SC_ReadString:
                     {
                         int virtualAddr, length;
@@ -437,32 +437,55 @@ ExceptionHandler(ExceptionType which)
                     }
                     case SC_Create: 
                     { 
-                        int virtAddr; 
-                        char* filename; 
-                        // Lấy tham số tên tập tin từ thanh ghi r4 
-                        virtAddr = machine->ReadRegister(4); 
-                        filename = User2System(virtAddr,MaxFileLength+1); 
-                        if (filename == NULL) 
-                        { 
- 
-                            machine->WriteRegister(2,-1); // trả về lỗi cho chương 
-                            // trình người dùng 
-                            delete filename; 
-                            return; 
-                        } 
+                    int virtAddr;
+                    char* filename;
+                    DEBUG('a', "\n SC_CreateFile call ...");
+                    DEBUG('a', "\n Reading virtual address of filename");
 
-                        if (!fileSystem->Create(filename,0)) 
-                        { 
-                            //printf("\n Error create file '%s'",filename); 
-                            machine->WriteRegister(2,-1); 
-                            delete filename; 
-                            return; 
-                        } 
-                        machine->WriteRegister(2,0); // trả về cho chương trình 
-                            // người dùng thành công 
+                    virtAddr = machine->ReadRegister(4); //Doc dia chi cua file tu thanh ghi R4
+                    DEBUG('a', "\n Reading filename.");
+                    
+                    //Sao chep khong gian bo nho User sang System, voi do dang toi da la (32 + 1) bytes
+                    filename = User2System(virtAddr, MaxFileLength + 1);
+                    if (strlen(filename) == 0)
+                    {
+                        printf("\n File name is not valid");
+                        DEBUG('a', "\n File name is not valid");
+                        machine->WriteRegister(2, -1); //Return -1 vao thanh ghi R2
+                        //IncreasePC();
+                        //return;
+                        break;
+                    }
+                    
+                    if (filename == NULL)  //Neu khong doc duoc
+                    {
+                        printf("\n Not enough memory in system");
+                        DEBUG('a', "\n Not enough memory in system");
+                        machine->WriteRegister(2, -1); //Return -1 vao thanh ghi R2
                         delete filename;
-                        IncreasePC();
-                        break; 
+                        //IncreasePC();
+                        //return;
+                        break;
+                    }
+                    DEBUG('a', "\n Finish reading filename.");
+                    
+                    if (!fileSystem->Create(filename, 0)) //Tao file bang ham Create cua fileSystem, tra ve ket qua
+                    {
+                        //Tao file that bai
+                        printf("\n Error create file '%s'", filename);
+                        machine->WriteRegister(2, -1);
+                        delete filename;
+                        //IncreasePC();
+                        //return;
+                        break;
+                    }
+                    
+                    //Tao file thanh cong
+                    machine->WriteRegister(2, 0);
+                    delete filename;
+                    IncreasePC(); //Day thanh ghi lui ve sau de tiep tuc ghi
+                    //return;
+                    break;
                         }
                     case SC_Open:
                     {
@@ -587,7 +610,7 @@ ExceptionHandler(ExceptionType which)
                         return;
                     }
                     case SC_Write:
-                        {
+                    {
                             int virtAddr = machine->ReadRegister(4); // Lay dia chi cua tham so buffer tu thanh ghi so 4
                             int charcount = machine->ReadRegister(5); // Lay charcount tu thanh ghi so 5
                             int id = machine->ReadRegister(6); // Lay id cua file tu thanh ghi so 6
@@ -648,7 +671,225 @@ ExceptionHandler(ExceptionType which)
                                 IncreasePC();
                                 return;
                             }
+                    }
+                    		case SC_Seek:
+                        {
+                            // Input: Vi tri(int), id cua file(OpenFileID)
+                            // Output: -1: Loi, Vi tri thuc su: Thanh cong
+                            // Cong dung: Di chuyen con tro den vi tri thich hop trong file voi tham so la vi tri can chuyen va id cua file
+                            int pos = machine->ReadRegister(4); // Lay vi tri can chuyen con tro den trong file
+                            int id = machine->ReadRegister(5); // Lay id cua file
+                            // Kiem tra id cua file truyen vao co nam ngoai bang mo ta file khong
+                            if (id < 0 || id > 14)
+                            {
+                                printf("\nKhong the seek vi id nam ngoai bang mo ta file.");
+                                machine->WriteRegister(2, -1);
+                                IncreasePC();
+                                return;
+                            }
+                            // Kiem tra file co ton tai khong
+                            if (fileSystem->openf[id] == NULL)
+                            {
+                                printf("\nKhong the seek vi file nay khong ton tai.");
+                                machine->WriteRegister(2, -1);
+                                IncreasePC();
+                                return;
+                            }
+                            // Kiem tra co goi Seek tren console khong
+                            if (id == 0 || id == 1)
+                            {
+                                printf("\nKhong the seek tren file console.");
+                                machine->WriteRegister(2, -1);
+                                IncreasePC();
+                                return;
+                            }
+                            // Neu pos = -1 thi gan pos = Length nguoc lai thi giu nguyen pos
+                            pos = (pos == -1) ? fileSystem->openf[id]->Length() : pos;
+                            if (pos > fileSystem->openf[id]->Length() || pos < 0) // Kiem tra lai vi tri pos co hop le khong
+                            {
+                                printf("\nKhong the seek file den vi tri nay.");
+                                machine->WriteRegister(2, -1);
+                            }
+                            else
+                            {
+                                // Neu hop le thi tra ve vi tri di chuyen thuc su trong file
+                                fileSystem->openf[id]->Seek(pos);
+                                machine->WriteRegister(2, pos);
+                            }
+                            IncreasePC();
+                            return;
                         }
+                    case SC_Exec:
+		            {
+			            // Input: vi tri int
+			            // Output: Fail return -1, Success: return id cua thread dang chay
+			            // SpaceId Exec(char *name);
+			            int virtAddr;
+			            virtAddr = machine->ReadRegister(4);	// doc dia chi ten chuong trinh tu thanh ghi r4
+			            char* name;
+			            name = User2System(virtAddr, MaxFileLength + 1); // Lay ten chuong trinh, nap vao kernel
+	
+			            if(name == NULL)
+			            {
+				            DEBUG('a', "\n Not enough memory in System");
+				            printf("\n Not enough memory in System");
+				            machine->WriteRegister(2, -1);
+				            //IncreasePC();
+				            return;
+			            }
+			            OpenFile *oFile = fileSystem->Open(name);
+			            if (oFile == NULL)
+			            {
+				            printf("\nExec:: Can't open this file.");
+				            machine->WriteRegister(2,-1);
+				            IncreasePC();
+				            return;
+			            }
+
+			            delete oFile;
+
+			            // Return child process id
+			            int id = pTab->ExecUpdate(name); 
+			            machine->WriteRegister(2,id);
+
+			            delete[] name;	
+			            IncreasePC();
+			            return;
+		            }
+                        
+                    case SC_Join:
+		            {       
+			            // int Join(SpaceId id)
+			            // Input: id dia chi cua thread
+			            // Output: 
+			            int id = machine->ReadRegister(4);
+			
+			            int res = pTab->JoinUpdate(id);
+			
+			            machine->WriteRegister(2, res);
+			            IncreasePC();
+			            return;
+		            }
+		            case SC_Exit:
+		            {
+			            //void Exit(int status);
+			            // Input: status code
+			            int exitStatus = machine->ReadRegister(4);
+
+			            if(exitStatus != 0)
+			            {
+				            IncreasePC();
+				            return;
+				
+			            }			
+			
+			            int res = pTab->ExitUpdate(exitStatus);
+			            //machine->WriteRegister(2, res);
+
+			            currentThread->FreeSpace();
+			            currentThread->Finish();
+			            IncreasePC();
+			            return; 
+		            }
+                    case SC_CreateSemaphore:
+		            {
+			            int virtAddr = machine->ReadRegister(4);
+			            int semval = machine->ReadRegister(5);
+
+			            char *name = User2System(virtAddr, MaxFileLength + 1);
+			            if(name == NULL)
+			            {
+				            DEBUG('a', "\n Not enough memory in System");
+				            printf("\n Not enough memory in System");
+				            machine->WriteRegister(2, -1);
+				            delete[] name;
+				            IncreasePC();
+				            return;
+			            }
+			
+			            int res = semTab->Create(name, semval);
+
+			            if(res == -1)
+			            {
+				            DEBUG('a', "\n Khong the khoi tao semaphore");
+				            printf("\n Khong the khoi tao semaphore");
+				            machine->WriteRegister(2, -1);
+				            delete[] name;
+				            IncreasePC();
+				            return;				
+			            }
+			
+			            delete[] name;
+			            machine->WriteRegister(2, res);
+			            IncreasePC();
+			            return;
+                    }
+		            case SC_Down:			
+		            {
+			            // int Down(char* name)
+			            int virtAddr = machine->ReadRegister(4);
+
+			            char *name = User2System(virtAddr, MaxFileLength + 1);
+			            if(name == NULL)
+			            {
+				            DEBUG('a', "\n Not enough memory in System");
+				            printf("\n Not enough memory in System");
+				            machine->WriteRegister(2, -1);
+				            delete[] name;
+				            IncreasePC();
+				            return;
+			            }
+			
+			            int res = semTab->Wait(name);
+
+			            if(res == -1)
+			            {
+				            DEBUG('a', "\n Khong ton tai ten semaphore nay!");
+				            printf("\n Khong ton tai ten semaphore nay!");
+				            machine->WriteRegister(2, -1);
+				            delete[] name;
+				            IncreasePC();
+				            return;				
+			            }
+			
+			            delete[] name;
+			            machine->WriteRegister(2, res);
+			            IncreasePC();
+			            return;
+		            }
+		            case SC_Up:		
+		            {
+			            // int Up(char* name)
+			            int virtAddr = machine->ReadRegister(4);
+
+			            char *name = User2System(virtAddr, MaxFileLength + 1);
+			            if(name == NULL)
+			            {
+				            DEBUG('a', "\n Not enough memory in System");
+				            printf("\n Not enough memory in System");
+				            machine->WriteRegister(2, -1);
+				            delete[] name;
+				            IncreasePC();
+				            return;
+			            }
+			
+			            int res = semTab->Signal(name);
+
+			            if(res == -1)
+			            {
+				            DEBUG('a', "\n Khong ton tai ten semaphore nay!");
+				            printf("\n Khong ton tai ten semaphore nay!");
+				            machine->WriteRegister(2, -1);
+				            delete[] name;
+				            IncreasePC();
+				            return;				
+			            }
+			
+			            delete[] name;
+			            machine->WriteRegister(2, res);
+			            IncreasePC();
+			            return;
+	            	}
            }              
     }
 }

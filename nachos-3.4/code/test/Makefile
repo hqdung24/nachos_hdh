@@ -35,7 +35,7 @@ CPP = gcc -E
 INCDIR =-I../userprog -I../threads
 CFLAGS = -G 0 -c $(INCDIR)
 
-all: halt shell matmult sort test ascii help mergesort quicksort
+all: halt shell matmult sort test ascii help mergesort quicksort ping pong pingpong hanhkhach mayquet HkMq 
 
 start.o: start.s ../userprog/syscall.h
 	$(CPP) $(CPPFLAGS) start.c > strt.s
@@ -95,3 +95,39 @@ quicksort.o: quicksort.c
 quicksort: quicksort.o start.o
 	$(LD) $(LDFLAGS) start.o quicksort.o -o quicksort.coff
 	../bin/coff2noff quicksort.coff quicksort
+
+ping.o: ping.c
+	$(CC) $(CFLAGS) -c ping.c
+ping: ping.o start.o
+	$(LD) $(LDFLAGS) start.o ping.o -o ping.coff
+	../bin/coff2noff ping.coff ping
+
+pong.o: pong.c
+	$(CC) $(CFLAGS) -c pong.c
+pong: pong.o start.o
+	$(LD) $(LDFLAGS) start.o pong.o -o pong.coff
+	../bin/coff2noff pong.coff pong
+
+pingpong.o: pingpong.c
+	$(CC) $(CFLAGS) -c pingpong.c
+pingpong: pingpong.o start.o
+	$(LD) $(LDFLAGS) start.o pingpong.o -o pingpong.coff
+	../bin/coff2noff pingpong.coff pingpong
+
+hanhkhach.o: hanhkhach.c
+	$(CC) $(CFLAGS) -c hanhkhach.c
+hanhkhach: hanhkhach.o start.o
+	$(LD) $(LDFLAGS) start.o hanhkhach.o -o hanhkhach.coff
+	../bin/coff2noff hanhkhach.coff hanhkhach
+
+mayquet.o: mayquet.c
+	$(CC) $(CFLAGS) -c mayquet.c
+mayquet: mayquet.o start.o
+	$(LD) $(LDFLAGS) start.o mayquet.o -o mayquet.coff
+	../bin/coff2noff mayquet.coff mayquet
+
+HkMq.o: HkMq.c
+	$(CC) $(CFLAGS) -c HkMq.c
+HkMq: HkMq.o start.o
+	$(LD) $(LDFLAGS) start.o HkMq.o -o HkMq.coff
+	../bin/coff2noff HkMq.coff HkMq

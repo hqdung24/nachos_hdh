@@ -38,6 +38,11 @@
 #define SC_ReadString 17
 #define SC_PrintFloat	18
 #define SC_ReadFloat 19
+
+#define SC_CreateSemaphore	20
+#define SC_Down		21
+#define SC_Up		22
+#define SC_Seek 23
 #define SC_Sub 		43
 #define SC_FloatToBuffer 44
 
@@ -98,7 +103,7 @@ typedef int OpenFileId;
 #define ConsoleOutput	1  
  
 /* Create a Nachos file, with "name" */
-void Create(char *name);
+int Create(char *name);
 
 /* Open the Nachos file "name", and return an "OpenFileId" that can 
  * be used to read and write to the file.
@@ -152,6 +157,13 @@ char ReadChar();
 void ReadString(char buffer[], int length);
 int* ReadFloat();
 int FloatToBuffer(char* buffer, int num);
+
+int CreateSemaphore(char* name, int semval);
+
+int Down(char* name);
+
+int Up(char* name);
+int Seek(int pos, OpenFileId id);
 
 #endif /* IN_ASM */
 
